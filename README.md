@@ -1,4 +1,4 @@
-# Mini-vLLM Engine
+# Mini Inference Engine
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
@@ -767,71 +767,127 @@ mini-inference-engine/
 ├── engine/
 │   ├── __init__.py
 │   ├── model_adapter.py          # HuggingFace model wrapper
-│   ├── request.py                # Request state object (stub)
+│   ├── qwen2_cached.py           # Cached Qwen2 implementation (prefill/decode)
 │   ├── generation.py             # generate() with cached / uncached paths
-│   ├── kv_cache.py               # Contiguous + paged KV cache
-│   ├── scheduler.py              # Static + FCFS continuous batching
+│   ├── kv_cache.py               # KV cache base interface
+│   ├── contiguous_cache.py       # Contiguous KV-cache baseline
+│   ├── paged_kv_cache.py         # Paged KV cache
+│   ├── hf_kv_cache.py            # HF model KV-cache adapter
 │   ├── block_pool.py             # Fixed-size block pool + free-list
 │   ├── block_table.py            # Logical-to-physical block mapping
-│   └── attention.py              # Paged KV attention (stub)
+│   ├── batch_builder.py          # Batch construction from active requests
+│   ├── request_queue.py          # FCFS request queue
+│   ├── scheduler.py              # Scheduler dispatch (static + continuous)
+│   ├── static_runner.py          # Static batching runner
+│   ├── continuous_runner.py      # Continuous batching runner
+│   ├── types.py                  # Shared type definitions
+│   ├── request.py                # (stub)
+│   └── attention.py              # (stub — attention lives in qwen2_cached.py)
 │
 ├── bench/
-│   ├── workloads.py              # Workload generators (stub)
-│   ├── generator.py              # Synthetic request generator (stub)
 │   ├── metrics.py                # TTFT / ITL / TPOT / throughput / p50 / p95
 │   ├── runner.py                 # Benchmark orchestrator
-│   └── plots.py                  # Figure generation (stub)
+│   ├── workload.py               # Workload dataclass + spec
+│   ├── static_vs_continuous.py   # Static vs continuous batching benchmark
+│   ├── paged_vs_contiguous.py    # Paged vs contiguous KV benchmark
+│   ├── kv_cache_speed.py         # KV cache speed benchmark
+│   ├── kv_fragmentation.py       # KV memory fragmentation analysis
+│   ├── run_latency_curve.py      # Latency-vs-throughput curve runner
+│   ├── workloads.py              # (stub — use workload.py)
+│   ├── generator.py              # (stub)
+│   ├── plots.py                  # (stub)
+│   ├── latency_throughput_curve.png
+│   └── paged_vs_contiguous_capacity.png
 │
 ├── tests/
-│   ├── test_generation.py        # Cached vs uncached correctness (stub)
-│   ├── test_kv_cache.py          # KV cache correctness
-│   ├── test_scheduler.py         # Scheduler behavior (stub)
-│   ├── test_block_pool.py        # Block pool allocation/free
-│   ├── test_block_table.py       # Block table mapping
-│   └── test_paged_attention.py   # Paged attention correctness (stub)
+│   ├── test_kv_cache.py                  # KV cache base tests
+│   ├── test_kv_cache_correctness.py      # Cached = uncached correctness (18.8KB)
+│   ├── test_kv_cache_attention_diagnostic.py  # Attention divergence diagnostics (54KB)
+│   ├── test_kv_numerical_equivalence.py  # Numerical equivalence across paths
+│   ├── test_contiguous_cache.py          # Contiguous KV cache tests
+│   ├── test_paged_kv_correctness.py      # Paged KV correctness
+│   ├── test_paged_qwen_attention.py      # Paged attention on real Qwen2
+│   ├── test_paged_qwen_model.py          # End-to-end paged Qwen2
+│   ├── test_paged_qwen_multiblock.py     # Multi-block paged attention (16.3KB)
+│   ├── test_prefill_decode.py            # Prefill/decode separation
+│   ├── test_ragged_decode.py             # Ragged active batch decode (10.8KB)
+│   ├── test_single_generation.py         # Single-request generation
+│   ├── test_static_batching.py           # Static batching behavior
+│   ├── test_continuous_scheduler.py      # Continuous scheduler behavior
+│   ├── test_batch_builder.py             # Batch construction
+│   ├── test_request_queue.py             # FCFS queue behavior
+│   ├── test_block_pool.py               # Block pool allocation/free
+│   ├── test_block_table.py              # Block table mapping
+│   ├── test_metrics.py                   # Benchmark metrics tests
+│   ├── test_workload.py                  # Workload spec tests (9.2KB)
+│   ├── test_generation.py                # (stub)
+│   ├── test_paged_attention.py           # (stub — covered by test_paged_qwen_*)
+│   └── test_scheduler.py                 # (stub — covered by test_continuous_scheduler)
 │
 ├── serve/
-│   ├── fastapi_app.py            # FastAPI + SSE streaming server (stub)
-│   └── locustfile.py             # Locust load-test definition
+│   ├── locustfile.py             # Locust load-test definition
+│   ├── vllm-run-on-colab.ipynb   # vLLM deployment on Colab (T4)
+│   └── fastapi_app.py            # FastAPI + SSE streaming server (stub)
 │
 ├── configs/
-│   ├── workload_single.yaml      # S1: single request
-│   ├── workload_batch.yaml       # S2/S3: variable-length + concurrent (stub)
-│   └── workload_saturation.yaml  # S4: saturation sweep (stub)
+│   ├── workload_single.yaml          # S1: single request
+│   ├── inference.yaml                # Inference engine config
+│   ├── workload_spec_template.yaml   # Workload spec template
+│   ├── workload_batch.yaml           # S2/S3: variable-length + concurrent (stub)
+│   └── workload_saturation.yaml      # S4: saturation sweep (stub)
 │
 ├── experiments/
-│   ├── EXP-2026-014.md           # Static vs continuous batching
-│   ├── EXP-2026-015.md           # Contiguous KV baseline + fragmentation
-│   ├── EXP-2026-016.md           # Paged vs contiguous KV utilization
-│   ├── EXP-2026-017.md           # Latency vs throughput (RTX 3050)
-│   ├── EXP-2026-018_vllm_load.md # vLLM concurrency load test
-│   ├── EXP-2026-019_vllm_vs_mini_engine.md  # Mini engine vs vLLM on T4
-│   └── results/                  # Raw benchmark outputs
+│   ├── EXP-2026-014.md                       # Static vs continuous batching
+│   ├── EXP-2026-015.md                       # Contiguous KV baseline + fragmentation
+│   ├── EXP-2026-016.md                       # Paged vs contiguous KV utilization
+│   ├── EXP-2026-017.md                       # Latency vs throughput (RTX 3050)
+│   ├── EXP-2026-018_vllm_load.md             # vLLM concurrency load test
+│   ├── EXP-2026-018_graphs_vllm_load.ipynb   # vLLM load graphs
+│   ├── EXP-2026-019_vllm_vs_mini_engine.md   # Mini engine vs vLLM on T4
+│   ├── image.png, image-1.png, image-2.png   # Experiment figures
+│   ├── vllm_load/                            # vLLM load-test raw results
+│   └── results/                              # Raw benchmark outputs
+│
+├── results/
+│   ├── kv_cache_speed_metadata.json
+│   ├── kv_cache_speed_raw.csv
+│   └── workload_single.yaml
 │
 ├── docs/
 │   ├── architecture.md
 │   ├── environment.md
+│   ├── decisions.md              # Engineering decisions
+│   ├── experiment_format.md      # Experiment report format
 │   ├── inference_glossary.md
 │   ├── benchmark-metrics.md
 │   ├── static_vs_continuous.md
-│   └── kv_cache_bug_playbook.md  # (stub)
+│   ├── kv_cache_speed.md
+│   └── kv_cache_bug_playbook.md  # (stub — see bugs/KV_CACHE_BUG_PLAYBOOK.md)
 │
 ├── scripts/
+│   ├── cache_utils.py            # Cache utility helpers
+│   ├── requests.py               # HTTP request helpers
 │   ├── benchmark.py              # Benchmark runner (stub)
 │   └── plot_results.py           # Figure regeneration (stub)
 │
 ├── bugs/
-│   └── KV_CACHE_BUG_PLAYBOOK.md  # Debugging procedure for KV-cache divergence
+│   ├── KV_CACHE_BUG_PLAYBOOK.md       # Debugging procedure for KV-cache divergence
+│   └── BUG-template-kv-offset.md      # Bug report template
 │
 ├── reports/
 │   ├── vllm_source_mapping.md    # Mini-engine → vLLM mechanism mapping
-│   └── why_vllm_wins.md          # Gap analysis
+│   ├── why_vllm_wins.md          # Gap analysis
+│   └── kv_cache_speedup.md       # KV cache speedup measurements
 │
 ├── commands/
 │   └── vllm_t4.md                # vLLM T4 deployment recipe
 │
-├── figures/                      # Benchmark figures
 ├── notes/
+│   ├── kv_cache_prealocated.md   # Pre-allocated KV cache design (20KB)
+│   ├── kv_cache_layout.md        # KV cache memory layout
+│   └── prefill_decode.md         # Prefill/decode separation notes
+│
+├── figures/                      # Top-level benchmark figures
 ├── pyproject.toml
 └── README.md
 ```
