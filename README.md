@@ -1,8 +1,33 @@
-# Mini Inference Engine
+# Mini-vLLM Engine
+
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![Status](https://img.shields.io/badge/status-M6%20WIP-orange.svg)](#status)
 
 A from-scratch LLM inference engine focused on the core mechanisms behind modern high-throughput serving systems. Implements prefill/decode execution, KV caching, continuous batching, paged KV memory, block-table management, and a reproducible inference benchmark harness in PyTorch.
 
 The project then compares the implementation against vLLM and evaluates BF16, GPTQ, and AWQ serving for an Algerian Darija DPO model.
+
+---
+
+## Quickstart
+
+```bash
+# 1. Install dependencies
+pip install torch transformers pyyaml numpy matplotlib pytest
+
+# 2. Run the correctness test suite
+pytest tests/ -v
+
+# 3. Run a single-request benchmark (KV-cache correctness + prefill/decode timing)
+python scripts/benchmark.py --config configs/workload_single.yaml
+
+# 4. Run the continuous-batching benchmark (latency vs throughput)
+python scripts/benchmark.py --config configs/workload_batch.yaml
+
+# 5. Reproduce the figures in reports/
+python scripts/plot_results.py --results experiments/results/
+```
 
 ---
 
@@ -665,7 +690,7 @@ Measured effects are distinguished from architectural inferences that cannot be 
 
 
 
-**Expirements and docs:**
+**Experiments and docs:**
 
 * [vLLM on NVIDIA T4](commands/vllm_t4.md)
 * [EXP-2026-018 vLLM Concurrency Load Test](./experiments/EXP-2026-018_vllm_load.md)
@@ -741,56 +766,72 @@ The project treats implementation and evidence as separate deliverables.
 mini-inference-engine/
 ├── engine/
 │   ├── __init__.py
-│   ├── model_adapter.py
-│   ├── request.py
-│   ├── generation.py
-│   ├── kv_cache.py
-│   ├── scheduler.py
-│   ├── block_pool.py
-│   ├── block_table.py
-│   └── attention.py
+│   ├── model_adapter.py          # HuggingFace model wrapper
+│   ├── request.py                # Request state object (stub)
+│   ├── generation.py             # generate() with cached / uncached paths
+│   ├── kv_cache.py               # Contiguous + paged KV cache
+│   ├── scheduler.py              # Static + FCFS continuous batching
+│   ├── block_pool.py             # Fixed-size block pool + free-list
+│   ├── block_table.py            # Logical-to-physical block mapping
+│   └── attention.py              # Paged KV attention (stub)
 │
 ├── bench/
-│   ├── workloads.py
-│   ├── generator.py
-│   ├── metrics.py
-│   ├── runner.py
-│   └── plots.py
+│   ├── workloads.py              # Workload generators (stub)
+│   ├── generator.py              # Synthetic request generator (stub)
+│   ├── metrics.py                # TTFT / ITL / TPOT / throughput / p50 / p95
+│   ├── runner.py                 # Benchmark orchestrator
+│   └── plots.py                  # Figure generation (stub)
 │
 ├── tests/
-│   ├── test_generation.py
-│   ├── test_kv_cache.py
-│   ├── test_scheduler.py
-│   ├── test_block_pool.py
-│   ├── test_block_table.py
-│   └── test_paged_attention.py
+│   ├── test_generation.py        # Cached vs uncached correctness (stub)
+│   ├── test_kv_cache.py          # KV cache correctness
+│   ├── test_scheduler.py         # Scheduler behavior (stub)
+│   ├── test_block_pool.py        # Block pool allocation/free
+│   ├── test_block_table.py       # Block table mapping
+│   └── test_paged_attention.py   # Paged attention correctness (stub)
 │
 ├── serve/
-│   ├── fastapi_app.py
-│   └── locustfile.py
+│   ├── fastapi_app.py            # FastAPI + SSE streaming server (stub)
+│   └── locustfile.py             # Locust load-test definition
 │
 ├── configs/
-│   ├── workload_single.yaml
-│   ├── workload_batch.yaml
-│   └── workload_saturation.yaml
+│   ├── workload_single.yaml      # S1: single request
+│   ├── workload_batch.yaml       # S2/S3: variable-length + concurrent (stub)
+│   └── workload_saturation.yaml  # S4: saturation sweep (stub)
 │
 ├── experiments/
-│   └── results/
+│   ├── EXP-2026-014.md           # Static vs continuous batching
+│   ├── EXP-2026-015.md           # Contiguous KV baseline + fragmentation
+│   ├── EXP-2026-016.md           # Paged vs contiguous KV utilization
+│   ├── EXP-2026-017.md           # Latency vs throughput (RTX 3050)
+│   ├── EXP-2026-018_vllm_load.md # vLLM concurrency load test
+│   ├── EXP-2026-019_vllm_vs_mini_engine.md  # Mini engine vs vLLM on T4
+│   └── results/                  # Raw benchmark outputs
 │
 ├── docs/
 │   ├── architecture.md
 │   ├── environment.md
-│   ├── workload_contract.md
 │   ├── inference_glossary.md
-│   └── kv_cache_bug_playbook.md
+│   ├── benchmark-metrics.md
+│   ├── static_vs_continuous.md
+│   └── kv_cache_bug_playbook.md  # (stub)
 │
 ├── scripts/
-│   ├── benchmark.py
-│   └── plot_results.py
+│   ├── benchmark.py              # Benchmark runner (stub)
+│   └── plot_results.py           # Figure regeneration (stub)
 │
 ├── bugs/
-│   └── KV_CACHE_BUG_PLAYBOOK.md
+│   └── KV_CACHE_BUG_PLAYBOOK.md  # Debugging procedure for KV-cache divergence
 │
+├── reports/
+│   ├── vllm_source_mapping.md    # Mini-engine → vLLM mechanism mapping
+│   └── why_vllm_wins.md          # Gap analysis
+│
+├── commands/
+│   └── vllm_t4.md                # vLLM T4 deployment recipe
+│
+├── figures/                      # Benchmark figures
+├── notes/
 ├── pyproject.toml
 └── README.md
 ```
@@ -844,3 +885,4 @@ vLLM has been deployed, load-tested, mapped to the mini engine's mechanisms, and
 The comparison shows that vLLM achieves substantially higher throughput and scales much more effectively with concurrency. The resulting gap analysis identifies optimized GPU execution, attention kernels, scheduling, KV-cache integration, and runtime overhead as the main areas separating the educational implementation from a production serving engine.
 
 The next stage is **quantized serving of the Algerian Darija DPO model**, evaluating BF16, GPTQ, and AWQ across quality, memory, and latency.
+
